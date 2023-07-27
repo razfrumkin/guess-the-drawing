@@ -1,0 +1,29 @@
+# Ignore Node.js related files and folders
+node_modules/
+npm-debug.log
+yarn-error.log
+*.env
+
+# Ignore build output and other generated files
+dist/
+build/
+*.log
+*.pid
+*.out
+
+# Ignore package-lock.json for npm
+package-lock.json
+
+# Ignore yarn.lock for Yarn
+yarn.lock
+
+# Ignore VSCode specific files
+.vscode/
+
+# Ignore macOS specific files
+.DS_Store
+
+# Ignore .env files (contains sensitive data, should not be version controlled)
+.env.*
+
+# Ignore any other files or folders specific to your project

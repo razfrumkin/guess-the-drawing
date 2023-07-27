@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "es6",                 /* Specify the ECMAScript target version */
+      "module": "commonjs",            /* Specify the module system (commonjs for Node.js) */
+      "outDir": "dist",                /* Specify the output directory for compiled JavaScript files */
+      "strict": true,                  /* Enable strict type-checking options */
+      "esModuleInterop": true
+    },
+    "include": [
+      "src/**/*.ts"                   /* Include all TypeScript files under the 'src' directory */
+    ],
+    "exclude": [
+      "node_modules"                  /* Exclude the 'node_modules' directory from compilation */
+    ]
+}

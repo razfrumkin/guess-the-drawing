@@ -19,16 +19,19 @@ server.listen(port, () => {
     console.log(`Server is running on port ${port}`)
 })
 
-type Users = { [id: string]: string }
-const users: Users = {}
+type Settings = { canvasWidth: number, canvasHeight: number }
+type UserCollection = { [id: string]: string }
+
+const settings: Settings = { canvasWidth: 1000, canvasHeight: 800 }
+const users: UserCollection = {}
 
 io.on('connection', (socket: Socket) => {
     console.log(`Socket ${socket.id} has connected`)
 
     socket.on('joined', (username: string) => {
-        console.log(`Socket ${socket.id} has joined with the name "${username}"`)
+        console.log(`Socket ${socket.id} has joined with the username "${username}"`)
         users[socket.id] = username
-        socket.emit('welcome', users)
+        socket.emit('welcome', settings, users)
         io.emit('user-joined', socket.id, username)
     })
 

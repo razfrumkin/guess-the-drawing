@@ -30,10 +30,26 @@ type UserCollection = { [id: string]: string }
 
 type Vector2D = { x: number, y: number }
 type RGB = { red: number, green: number, blue: number }
-type DrawingInstruction = {
+
+type Stroke = {
     path: Vector2D[]
     color: RGB
     weight: number
+}
+
+type Fill = {
+    position: Vector2D
+    color: RGB
+}
+
+enum DrawingInstructionType {
+    STROKE,
+    FILL
+}
+
+type DrawingInstruction = {
+    type: DrawingInstructionType
+    value: Stroke | Fill
 }
 
 let settings: Settings
@@ -81,8 +97,8 @@ function activateSketch(sketch: p5) {
         setup(sketch)
     }
 
-    sketch.mouseDragged = () => {
-        
+    sketch.mousePressed = () => {
+        mousePressed(sketch)
     }
 
     sketch.draw = () => {
@@ -100,15 +116,21 @@ function activateSketch(sketch: p5) {
         sketch.strokeWeight(weight)
         sketch.point(position.x, position.y)
 
-        drawingInstructions.push(instruction)
+        drawingInstructions.push({ type: DrawingInstructionType.STROKE, value: instruction })
     })
 
     socket.on('drawing-position', (position: Vector2D) => {
-        const instruction = drawingInstructions[drawingInstructions.length - 1]
-        const previousPosition = instruction.path[instruction.path.length - 1]
+        const stroke = drawingInstructions[drawingInstructions.length - 1].value as Stroke
+        const previousPosition = stroke.path[stroke.path.length - 1]
         sketch.line(previousPosition.x, previousPosition.y, position.x, position.y)
 
-        instruction.path.push(position)
+        stroke.path.push(position)
+    })
+
+    socket.on('fill', (fill: Fill) => {
+        floodFill(sketch, fill)
+
+        drawingInstructions.push({ type: DrawingInstructionType.FILL, value: fill })
     })
 
     socket.on('reset', () => {
@@ -153,6 +175,7 @@ function setup(sketch: p5) {
     const renderer = sketch.createCanvas(settings.canvasWidth, settings.canvasHeight)
     container.insertAdjacentElement('afterbegin', renderer.elt)
     sketch.frameRate(60)
+    sketch.noSmooth()
 
     redrawAll(sketch)
 
@@ -195,6 +218,26 @@ function setup(sketch: p5) {
     })
 }
 
+function mousePressed(sketch: p5) {
+    if (sketch.mouseButton === sketch.LEFT) {
+        const mouse = { x: sketch.mouseX, y: sketch.mouseY }
+
+        if (!isInsideCanvas(mouse)) return
+
+        if (fillCheckbox.checked) {
+            const color = getInputColor()
+
+            const fill = { position: mouse, color: color }
+
+            floodFill(sketch, fill)
+
+            drawingInstructions.push({ type: DrawingInstructionType.FILL, value: fill })
+
+            socket.emit('fill', fill)
+        }
+    }
+}
+
 function input(sketch: p5) {
     if (sketch.mouseIsPressed) {
         if (sketch.mouseButton === sketch.LEFT) {
@@ -203,11 +246,7 @@ function input(sketch: p5) {
 
             if (!isInsideCanvas(mouse)) return
 
-            if (fillCheckbox.checked) {
-                floodFill(sketch, mouse)
-
-                return
-            }
+            if (fillCheckbox.checked) return
 
             if (path.length === 0) {
                 const weight = parseFloat(weightSlider.value)
@@ -236,32 +275,69 @@ function input(sketch: p5) {
                 weight: parseFloat(weightSlider.value)
             }
 
-            drawingInstructions.push(instruction)
+            drawingInstructions.push({ type: DrawingInstructionType.STROKE, value: instruction })
 
             path = []
         }
     }
 }
 
-function floodFill(sketch: p5, mouse: Vector2D) {
+function floodFill(sketch: p5, fill: Fill) {
+    const targetColor = getPixelColor(sketch, fill.position)
+
+    if (match(fill.color, targetColor)) return
+
     sketch.loadPixels()
 
+    const visited = new Array<Array<boolean>>(settings.canvasWidth)
+    for (let index = 0; index < visited.length; index += 1) {
+        visited[index] = new Array<boolean>(settings.canvasHeight).fill(false)
+    }
 
+    const pixels = [fill.position]
+
+    while (pixels.length > 0) {
+        const last = pixels.pop()!
+
+        if (!visited[last.x][last.y]) {
+            visited[last.x][last.y] = true
+            const currentColor = getPixelColor(sketch, last)
+
+            if (match(currentColor, targetColor)) {
+                setPixelColor(sketch, last, fill.color)
+    
+                if (last.x > 0) pixels.push({ x: last.x - 1, y: last.y })
+                if (last.x < settings.canvasWidth - 1) pixels.push({ x: last.x + 1, y: last.y })
+                if (last.y > 0) pixels.push({ x: last.x, y: last.y - 1 })
+                if (last.y < settings.canvasHeight - 1) pixels.push({ x: last.x, y: last.y + 1 })
+            }
+        }
+    }
 
     sketch.updatePixels()
 }
 
 function executeInstruction(sketch: p5, instruction: DrawingInstruction) {
+    if (instruction.type === DrawingInstructionType.FILL) {
+        const fill = instruction.value as Fill
+
+        floodFill(sketch, fill)
+
+        return
+    }
+
+    const stroke = instruction.value as Stroke
+
     sketch.noFill()
-    sketch.stroke(instruction.color.red, instruction.color.green, instruction.color.blue)
-    sketch.strokeWeight(instruction.weight)
-    if (instruction.path.length === 1) {
-        const position = instruction.path[0]
+    sketch.stroke(stroke.color.red, stroke.color.green, stroke.color.blue)
+    sketch.strokeWeight(stroke.weight)
+    if (stroke.path.length === 1) {
+        const position = stroke.path[0]
         sketch.point(position.x, position.y)
     } else {
         sketch.beginShape()
-        for (let index = 0; index < instruction.path.length; index += 1) {
-            const position = instruction.path[index]
+        for (let index = 0; index < stroke.path.length; index += 1) {
+            const position = stroke.path[index]
             sketch.vertex(position.x, position.y)
         }
         sketch.endShape()
@@ -281,4 +357,17 @@ function getInputColor(): RGB {
         green: parseFloat(greenSlider.value),
         blue: parseFloat(blueSlider.value),
     }
+}
+
+function getPixelColor(sketch: p5, position: Vector2D): RGB {
+    const color = sketch.get(position.x, position.y)
+    return { red: color[0], green: color[1], blue: color[2] }
+}
+
+function setPixelColor(sketch: p5, position: Vector2D, color: RGB) {
+    sketch.set(position.x, position.y, [color.red, color.green, color.blue, 255])
+}
+
+function match(first: RGB, second: RGB): boolean {
+    return first.red === second.red && first.green === second.green && first.blue === second.blue
 }

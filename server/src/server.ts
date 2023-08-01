@@ -31,12 +31,27 @@ type UserCollection = { [id: string]: string }
 
 type Vector2D = { x: number, y: number }
 type RGB = { red: number, green: number, blue: number }
-type DrawingInstruction = {
+
+type Stroke = {
     path: Vector2D[]
     color: RGB
     weight: number
 }
 
+type Fill = {
+    position: Vector2D
+    color: RGB
+}
+
+enum DrawingInstructionType {
+    STROKE,
+    FILL
+}
+
+type DrawingInstruction = {
+    type: DrawingInstructionType
+    value: Stroke | Fill
+}
 const settings: Settings = {
     canvasWidth: 700,
     canvasHeight: 700,
@@ -71,24 +86,33 @@ io.on('connection', (socket: Socket) => {
     socket.on('new-path', (position: Vector2D, color: RGB, weight: number) => {
         if (!isInsideCanvas(position)) return
 
+        weight = constrain(weight, settings.weightSliderMinimum, settings.weightSliderMaximum)
+
         const instruction = {
             path: [position],
             color: color,
-            weight: constrain(weight, settings.weightSliderMinimum, settings.weightSliderMaximum)
+            weight: weight
         }
 
-        drawingInstructions.push(instruction)
-        socket.broadcast.emit('new-path', position, color, instruction.weight)
+        drawingInstructions.push({ type: DrawingInstructionType.STROKE, value: instruction })
+        socket.broadcast.emit('new-path', position, color, weight)
     })
     
     socket.on('drawing-position', (position: Vector2D) => {
         if (!isInsideCanvas(position)) return
 
         if (drawingInstructions.length === 0) return
-        const instruction = drawingInstructions[drawingInstructions.length - 1]
+        const instruction = drawingInstructions[drawingInstructions.length - 1].value as Stroke
         if (instruction.path.length === 0) return
         instruction.path.push(position)
         socket.broadcast.emit('drawing-position', position)
+    })
+
+    socket.on('fill', (fill: Fill) => {
+        if (!isInsideCanvas(fill.position)) return
+
+        drawingInstructions.push({ type: DrawingInstructionType.FILL, value: fill })
+        socket.broadcast.emit('fill', fill)
     })
 
     socket.on('reset', () => {

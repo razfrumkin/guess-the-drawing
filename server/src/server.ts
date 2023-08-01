@@ -30,10 +30,10 @@ type Settings = {
 type UserCollection = { [id: string]: string }
 
 type Vector2D = { x: number, y: number }
-type RGBA = { red: number, green: number, blue: number, alpha: number }
+type RGB = { red: number, green: number, blue: number }
 type DrawingInstruction = {
     path: Vector2D[]
-    color: RGBA
+    color: RGB
     weight: number
 }
 
@@ -47,7 +47,7 @@ const settings: Settings = {
 
 const users: UserCollection = {}
 
-const drawingInstructions: DrawingInstruction[] = []
+let drawingInstructions: DrawingInstruction[] = []
 
 io.on('connection', (socket: Socket) => {
     console.log(`Socket ${socket.id} has connected`)
@@ -68,7 +68,7 @@ io.on('connection', (socket: Socket) => {
         }
     })
 
-    socket.on('new-path', (position: Vector2D, color: RGBA, weight: number) => {
+    socket.on('new-path', (position: Vector2D, color: RGB, weight: number) => {
         if (!isInsideCanvas(position)) return
 
         const instruction = {
@@ -89,6 +89,12 @@ io.on('connection', (socket: Socket) => {
         if (instruction.path.length === 0) return
         instruction.path.push(position)
         socket.broadcast.emit('drawing-position', position)
+    })
+
+    socket.on('reset', () => {
+        drawingInstructions = []
+
+        socket.broadcast.emit('reset')
     })
 
     socket.on('undo', () => {

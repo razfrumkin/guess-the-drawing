@@ -2,9 +2,20 @@ import p5 from 'p5'
 import { socket } from './join'
 
 const container = document.getElementById('container') as HTMLDivElement
+const resetButton = document.getElementById('reset-button') as HTMLButtonElement
+
+const redSlider = document.getElementById('red-slider') as HTMLInputElement
+const greenSlider = document.getElementById('green-slider') as HTMLInputElement
+const blueSlider = document.getElementById('blue-slider') as HTMLInputElement
+
+const redSpan = document.getElementById('red-span') as HTMLSpanElement
+const greenSpan = document.getElementById('green-span') as HTMLSpanElement
+const blueSpan = document.getElementById('blue-span') as HTMLSpanElement
+
 const undoButton = document.getElementById('undo-button') as HTMLButtonElement
 const weightSlider = document.getElementById('weight-slider') as HTMLInputElement
 const weightSpan = document.getElementById('weight-span') as HTMLSpanElement
+const fillCheckbox = document.getElementById('fill-checkbox') as HTMLInputElement
 const chat = document.getElementById('chat') as HTMLDivElement
 
 type Settings = {
@@ -18,10 +29,10 @@ type Settings = {
 type UserCollection = { [id: string]: string }
 
 type Vector2D = { x: number, y: number }
-type RGBA = { red: number, green: number, blue: number, alpha: number }
+type RGB = { red: number, green: number, blue: number }
 type DrawingInstruction = {
     path: Vector2D[]
-    color: RGBA
+    color: RGB
     weight: number
 }
 
@@ -78,14 +89,14 @@ function activateSketch(sketch: p5) {
         input(sketch)
     }
 
-    socket.on('new-path', (position: Vector2D, color: RGBA, weight: number) => {
+    socket.on('new-path', (position: Vector2D, color: RGB, weight: number) => {
         const instruction = {
             path: [position],
             color: color,
             weight: weight
         }
 
-        sketch.stroke(color.red, color.green, color.blue, color.alpha)
+        sketch.stroke(color.red, color.green, color.blue)
         sketch.strokeWeight(weight)
         sketch.point(position.x, position.y)
 
@@ -98,6 +109,12 @@ function activateSketch(sketch: p5) {
         sketch.line(previousPosition.x, previousPosition.y, position.x, position.y)
 
         instruction.path.push(position)
+    })
+
+    socket.on('reset', () => {
+        drawingInstructions = []
+
+        sketch.background(255, 255, 255)
     })
 
     socket.on('undo', () => {
@@ -139,6 +156,14 @@ function setup(sketch: p5) {
 
     redrawAll(sketch)
 
+    resetButton.addEventListener('click', () => {
+        drawingInstructions = []
+
+        sketch.background(255, 255, 255)
+
+        socket.emit('reset')
+    })
+
     undoButton.addEventListener('click', () => {
         if (drawingInstructions.length === 0) return
         drawingInstructions.pop()
@@ -146,6 +171,18 @@ function setup(sketch: p5) {
         redrawAll(sketch)
 
         socket.emit('undo')
+    })
+
+    redSlider.addEventListener('change', () => {
+        redSpan.textContent = redSlider.value
+    })
+
+    greenSlider.addEventListener('change', () => {
+        greenSpan.textContent = greenSlider.value
+    })
+    
+    blueSlider.addEventListener('change', () => {
+        blueSpan.textContent = blueSlider.value
     })
 
     weightSlider.min = settings.weightSliderMinimum.toString()
@@ -161,32 +198,41 @@ function setup(sketch: p5) {
 function input(sketch: p5) {
     if (sketch.mouseIsPressed) {
         if (sketch.mouseButton === sketch.LEFT) {
-            if (!isInsideCanvas({ x: sketch.mouseX, y: sketch.mouseY })) return
+            const mouse = { x: sketch.mouseX, y: sketch.mouseY }
+            const color = getInputColor()
+
+            if (!isInsideCanvas(mouse)) return
+
+            if (fillCheckbox.checked) {
+                floodFill(sketch, mouse)
+
+                return
+            }
 
             if (path.length === 0) {
                 const weight = parseFloat(weightSlider.value)
 
-                sketch.stroke(0, 0, 0, 255)
+                sketch.stroke(color.red, color.green, color.blue)
                 sketch.strokeWeight(weight)
-                sketch.point(sketch.mouseX, sketch.mouseY)
+                sketch.point(mouse.x, mouse.y)
 
-                path.push({ x: sketch.mouseX, y: sketch.mouseY })
+                path.push(mouse)
 
-                socket.emit('new-path', { x: sketch.mouseX, y: sketch.mouseY }, { red: 0, green: 0, blue: 0, alpha: 255 }, weight)
+                socket.emit('new-path', mouse, color, weight)
             } else {
                 const previousPosition = path[path.length - 1]
-                sketch.line(previousPosition.x, previousPosition.y, sketch.mouseX, sketch.mouseY)
+                sketch.line(previousPosition.x, previousPosition.y, mouse.x, mouse.y)
 
-                path.push({ x: sketch.mouseX, y: sketch.mouseY })
+                path.push(mouse)
 
-                socket.emit('drawing-position', { x: sketch.mouseX, y: sketch.mouseY })
+                socket.emit('drawing-position', mouse)
             }
         }
     } else {
         if (path.length > 0) {
             const instruction = {
                 path: path,
-                color: { red: 0, green: 0, blue: 0, alpha: 255 },
+                color: getInputColor(),
                 weight: parseFloat(weightSlider.value)
             }
 
@@ -197,9 +243,17 @@ function input(sketch: p5) {
     }
 }
 
+function floodFill(sketch: p5, mouse: Vector2D) {
+    sketch.loadPixels()
+
+
+
+    sketch.updatePixels()
+}
+
 function executeInstruction(sketch: p5, instruction: DrawingInstruction) {
     sketch.noFill()
-    sketch.stroke(instruction.color.red, instruction.color.green, instruction.color.blue, instruction.color.alpha)
+    sketch.stroke(instruction.color.red, instruction.color.green, instruction.color.blue)
     sketch.strokeWeight(instruction.weight)
     if (instruction.path.length === 1) {
         const position = instruction.path[0]
@@ -219,4 +273,12 @@ function isInsideCanvas(position: Vector2D): boolean {
            position.x < settings.canvasWidth &&
            position.y >= 0 &&
            position.y < settings.canvasHeight
+}
+
+function getInputColor(): RGB {
+    return {
+        red: parseFloat(redSlider.value),
+        green: parseFloat(greenSlider.value),
+        blue: parseFloat(blueSlider.value),
+    }
 }

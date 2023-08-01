@@ -10,9 +10,24 @@
 </head>
 <body>
   <div id="container">
+    <button id="reset-button">Reset</button>
     <button id="undo-button">Undo</button>
+    <div id="rgba-container">
+      <span style="background-color: red">Red</span>
+      <input type="range" id="red-slider" min="0" max="255" step="1" value="0">
+      <span id="red-span" style="background-color: red">0</span>
+
+      <span style="background-color: green">Green</span>
+      <input type="range" id="green-slider" min="0" max="255" step="1" value="0">
+      <span id="green-span" style="background-color: green">0</span>
+
+      <span style="background-color: blue">Blue</span>
+      <input type="range" id="blue-slider" min="0" max="255" step="1" value="0">
+      <span id="blue-span" style="background-color: blue">0</span>
+    </div>
     <input type="range" id="weight-slider">
     <span id="weight-span"></span>
+    <input type="checkbox" id="fill-checkbox">
     <div id="chat">
 
     </div>

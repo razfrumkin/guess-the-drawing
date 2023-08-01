@@ -22,8 +22,7 @@ function activateSocketEvents() {
         const span = document.createElement('span')
         span.textContent = `${username} has joined`
         span.style.color = 'green'
-        chat.insertBefore(document.createElement('br'), chat.firstChild)
-        chat.insertBefore(span, chat.firstChild)
+        chatLog(span)
 
         if (socket.id === id) return
         users[id] = username
@@ -33,8 +32,7 @@ function activateSocketEvents() {
         const span = document.createElement('span')
         span.textContent = `${users[id]} has left`
         span.style.color = 'red'
-        chat.insertBefore(document.createElement('br'), chat.firstChild)
-        chat.insertBefore(span, chat.firstChild)
+        chatLog(span)
 
         delete users[id]
     })
@@ -58,6 +56,23 @@ function activateSketch(sketch: p5) {
         input(sketch)
         render(sketch)
     }
+}
+
+function chatLog(span: HTMLSpanElement) {
+    chat.insertBefore(document.createElement('br'), chat.firstChild)
+    chat.insertBefore(span, chat.firstChild)
+    const time = document.createElement('span')
+    time.textContent = `${hoursMinutesSeconds()}: `
+    time.style.color = 'black'
+    chat.insertBefore(time, chat.firstChild)
+}
+
+function hoursMinutesSeconds(): string {
+    const now = new Date()
+    const hours = now.getHours().toString().padStart(2, '0')
+    const minutes = now.getMinutes().toString().padStart(2, '0')
+    const seconds = now.getSeconds().toString().padStart(2, '0')
+    return `${hours}:${minutes}:${seconds}`
 }
 
 function input(sketch: p5) {

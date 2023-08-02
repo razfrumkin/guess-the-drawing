@@ -11,19 +11,10 @@ export function join() {
     socket.on('connect', () => {
         console.log('Connected to the server')
 
-        /*joinButton.addEventListener('click', () => {
+        joinButton.addEventListener('click', () => {
             initializeGame(usernameField.value)
-        })*/
+        })
 
         form.style.display = 'none'
-        initializeGame(names[Math.floor(Math.random() * names.length)])
     })
 }
-
-const names: string[] = [
-    'david',
-    'joe',
-    'daniel',
-    'michael',
-    'harry'
-]
